@@ -1,6 +1,6 @@
 ---
 document: CareerLens Portfolio — Architecture Design
-version: 0.1.0
+version: 0.2.0
 status: draft
 scope: Phase 1
 last_updated: 2026-11-24
@@ -67,15 +67,51 @@ Next.js renders public pages using server-side data and returns the rendered pag
 
 **Boundaries and limitations:**
 - No direct browser calls to the Java API are planned for *public content retrieval*. Client-side interactions can still be used for UI behavior.
-- Client-side versus API-side filtering is **not yet decided**.
+- The project list is obtained server-side and filtered in the browser according to **AD-002**.
 - Contact-form submission is a separate write operation; its exact route is **not yet decided** and must not use public-page caching.
 - ISR does not guarantee availability for requests without a valid cache.
 - Revalidation intervals, cache keys, invalidation rules, error handling, and runtime rendering details remain **to be designed**.
 
+### AD-002 — Client-side filtering of the project list (Approved)
+
+**Decision date:** 2026-11-24
+
+**Decision:** Fetch the list of published projects from the Spring Boot API **on the Next.js server** (AD-001). Send the retrieved list to an interactive client-side component, which performs parent-category and subcategory filtering **in the visitor's browser**, without sending further requests for each filter change.
+
+**Interaction flow:**
+
+```text
+Initial page request
+  Next.js server -> Spring Boot API -> PostgreSQL
+          |
+          v
+  Rendered project list + published project data
+          |
+          v
+  Browser: change category/subcategory
+          |
+          v
+  Filter already-received data locally (no new API request)
+```
+
+**Filtering rules (from the approved requirements):**
+- Parent category: one of `All Projects`, `Professional`, or `Personal Project` (default `All Projects`).
+- Show the subcategory selector only after a specific parent is selected.
+- Subcategory: one of `All` or exactly one subcategory belonging to the selected parent (default `All`).
+- Changing the parent resets the subcategory to `All`; old choices are not restored.
+- Preserve the default order: `Professional` before `Personal Project`, newest first within each parent.
+- Never include unpublished projects in the data delivered to the browser.
+
+**Rationale:** For the expected size of a personal portfolio, local filtering is responsive, straightforward to test, and avoids repeated API calls and additional loading states.
+
+**Boundaries and limitations:**
+- This decision is specific to the public project list. Project detail, profile, and skills retrieval remain subject to AD-001.
+- Query parameters, URL persistence of active filters, pagination, and exact handling of partially specified dates are **not decided** here.
+- If the dataset grows significantly, the filtering strategy can be reassessed by a separately approved change.
+
 ## 4. Open Basic-design Topics
 
 - Rendering and caching details for dynamic route pages.
-- Project list filtering execution location and associated API behavior.
 - Contact-form submission path and abuse controls.
 - Java backend application layering and dependency choices.
 - Database physical schema, constraints, and migration strategy.
